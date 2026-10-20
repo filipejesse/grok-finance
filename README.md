@@ -1,85 +1,103 @@
 # grok-finance
 
-Controle financeiro pessoal usando **Grok** + **Open Finance** (via Meu Pluggy).
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Open Finance](https://img.shields.io/badge/Open%20Finance-Brazil-green.svg)](https://openfinancebrasil.org.br/)
 
-> Script Python que puxa os dados dos seus bancos, gera um resumo limpo e entrega pro Grok analisar.
+> Personal finance control using **Grok** + **Open Finance** (via Meu Pluggy).
 
-## Visão geral
+A lightweight Python tool that fetches your bank data through Open Finance, generates a clean summary, and prepares it for analysis with Grok.
 
-O **grok-finance** automatiza a ponte entre suas contas bancárias e o Grok:
+---
 
-1. Conecta seus bancos pelo **Meu Pluggy** (gratuito para uso pessoal)
-2. Um script Python busca, limpa e resume as transações
-3. O resumo é enviado ao Grok para análise, projeções e alertas
+## Overview
 
-Ideal para quem quer visão consolidada de 1 a 5 bancos sem complexidade regulatória.
+**grok-finance** bridges your Brazilian bank accounts and Grok:
 
-## Arquitetura
+1. Connect your banks via **Meu Pluggy** (free for personal use)
+2. A Python script fetches, cleans, and summarizes transactions
+3. The summary is ready to be analyzed by Grok (projections, alerts, insights)
 
+Designed for personal use with 1–5 bank accounts, without regulatory complexity.
+
+## Architecture
+
+```mermaid
+flowchart TD
+    A[Banks<br/>Nubank, Itaú, etc.] -->|Open Finance Consent| B[Meu Pluggy<br/>API]
+    B -->|JSON Data| C[Python Script<br/>Clean + Summarize]
+    C -->|Clean Summary| D[Grok<br/>Analysis & Alerts]
+    D -->|Insights| E[User]
+
+    style A fill:#ffc9c9
+    style B fill:#ffd8a8
+    style C fill:#b2f2bb
+    style D fill:#d0bfff
+    style E fill:#a5d8ff
 ```
-Bancos
-   ↓
-Meu Pluggy (API)
-   ↓
-Script Python (limpeza + resumo)
-   ↓
-Grok (análise)
-```
 
-## Funcionalidades atuais
+## Features
 
-- Autenticação na API do Meu Pluggy
-- Listagem de contas conectadas
-- Busca de transações do período
-- Geração de resumo enxuto (texto)
-- Formato otimizado para colar no Grok
+- Authentication with Meu Pluggy API
+- List connected accounts and balances
+- Fetch transactions for a given period
+- Generate a concise, Grok-ready summary
+- Privacy-focused (only summaries leave your environment)
 
-## Pré-requisitos
+## Prerequisites
 
-- Python 3.10+
-- Conta no [Meu Pluggy](https://pluggy.ai/meu-pluggy) com os bancos já conectados
-- Credenciais da API (`clientId` e `clientSecret`)
+- Python 3.10 or higher
+- A [Meu Pluggy](https://pluggy.ai/meu-pluggy) account with your banks already connected
+- API credentials (`clientId` and `clientSecret`) from the Pluggy dashboard
 
-## Instalação
+## Installation
 
 ```bash
 git clone https://github.com/filipejesse/grok-finance.git
 cd grok-finance
 python -m venv venv
-source venv/bin/activate  # ou venv\Scripts\activate no Windows
+source venv/bin/activate          # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Crie um arquivo `.env` na raiz:
+Create a `.env` file in the project root:
 
 ```env
-PLUGGY_CLIENT_ID=seu_client_id
-PLUGGY_CLIENT_SECRET=seu_client_secret
+PLUGGY_CLIENT_ID=your_client_id
+PLUGGY_CLIENT_SECRET=your_client_secret
 ```
 
-## Uso
+## Usage
 
 ```bash
 python main.py
 ```
 
-O script imprime (ou salva) um resumo no formato:
+The script outputs a summary like:
 
 ```text
-=== RESUMO FINANCEIRO - MÊS/ANO ===
-Contas:
-- Nubank: R$ X.XXX,XX
+=== FINANCIAL SUMMARY - MONTH/YEAR ===
+Accounts:
+- Nubank: R$ X,XXX.XX
+- Itaú: R$ X,XXX.XX
+
+Period Movement:
+- Inflows: R$ X,XXX.XX
+- Outflows: R$ X,XXX.XX
+- Net: R$ X,XXX.XX
+
+Top Categories:
+1. Housing: R$ X,XXX
+2. Food: R$ X,XXX
 ...
 
-Movimentação:
-- Entradas: R$ X.XXX
-- Saídas: R$ X.XXX
-...
+Notable Transactions:
+- [date] Description - R$ XXX
 ```
 
-Cole o resultado no Grok e peça a análise.
+Paste the output into Grok and ask for analysis, projections, or alerts.
 
-## Estrutura do projeto
+## Project Structure
 
 ```
 grok-finance/
@@ -91,29 +109,41 @@ grok-finance/
 └── config.py
 ```
 
-## Segurança
+## Security
 
-- Nunca commite o `.env`
-- O token do Meu Pluggy pode ser revogado a qualquer momento no dashboard
-- O script só deve rodar em ambiente controlado por você
-- Apenas o resumo (não os dados brutos) deve ir para o Grok
+- Never commit your `.env` file
+- Pluggy tokens can be revoked at any time from the dashboard
+- Run the script only in an environment you control
+- Only summaries (never raw transaction data) should be sent to Grok
 
 ## Roadmap
 
-- [ ] Envio automático do resumo para a API do Grok
-- [ ] Agendamento (Cloud Function / cron)
-- [ ] Categorização mais inteligente
-- [ ] Suporte a mais de um período
-- [ ] Relatórios mensais
+- [ ] Automatic sending of summaries to Grok API
+- [ ] Scheduled runs (Cloud Function / cron)
+- [ ] Smarter transaction categorization
+- [ ] Multi-period support
+- [ ] Monthly reports
 
-## Contribuição
+## Contributing
 
-Contribuições são bem-vindas. Abra uma issue ou envie um pull request.
+Contributions are welcome!
 
-## Licença
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-MIT
+Please make sure to update tests as appropriate.
 
-## Aviso
+## License
 
-Este projeto é de uso pessoal. Não é um produto financeiro regulado. Use por sua conta e risco.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Disclaimer
+
+This is a personal-use tool. It is **not** a regulated financial product. Use at your own risk. The authors are not responsible for any financial decisions made based on the output of this tool.
+
+---
+
+Made with ❤️ for better personal finance visibility.

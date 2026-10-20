@@ -1,2 +1,4 @@
 requests>=2.31
 python-dotenv>=1.0
+# Cloud function runtime only (needs Python 3.10+).
+firebase-functions>=0.4; python_version >= "3.10"

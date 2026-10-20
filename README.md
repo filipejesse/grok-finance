@@ -75,8 +75,9 @@ Personal rules (salary/rent days, keyword categories, atypical-transaction thres
 ## Usage
 
 ```bash
-python main.py          # print the summary
-python main.py --save   # also write output/resumo-YYYY-MM.txt and .json
+python cli.py           # print the summary
+python cli.py --save    # also write output/resumo-YYYY-MM.txt and .json
+python cli.py --email   # also e-mail it (needs GMAIL_* in .env)
 ```
 
 It fetches the current month plus the previous one (`PREVIOUS_MONTHS` in `config.py`). Card bill payments and transfers between your own accounts are excluded from the totals to avoid double counting.
@@ -105,16 +106,36 @@ Notable Transactions:
 
 Paste the output into Grok and ask for analysis, projections, or alerts.
 
+## Cloud deployment (Firebase)
+
+`main.py` is a scheduled Cloud Function (Python 3.12, `southamerica-east1`) that e-mails the summary every Monday at 08:00 (São Paulo). Change `CLOUD_SCHEDULE` in `config.py` to adjust.
+
+Every push to `master` deploys through GitHub Actions (`.github/workflows/deploy.yml`):
+
+1. Tests run.
+2. The workflow authenticates to Google Cloud with Workload Identity Federation (no key stored in GitHub).
+3. GitHub secrets are copied to Google Secret Manager, the function is deployed and old secret versions are destroyed.
+
+Required **GitHub secrets**: `PLUGGY_CLIENT_ID`, `PLUGGY_CLIENT_SECRET`, `PLUGGY_ITEM_IDS`, `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD` ([Gmail app password](https://myaccount.google.com/apppasswords), needs 2-step verification).
+Required **GitHub variables**: `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT`.
+
+The summary is never written to logs. The workflow never runs the report, because Actions logs are public on public repositories.
+
 ## Project Structure
 
 ```
 grok-finance/
 ├── .env.example
 ├── requirements.txt
-├── main.py              # entry point
+├── cli.py               # local entry point
+├── main.py              # Cloud Function entry point
+├── report.py            # fetch + summarize (shared)
+├── emailer.py           # Gmail SMTP
 ├── pluggy_client.py     # authentication + API calls
 ├── processor.py         # cleaning, categorization and summary
 ├── config.py            # fixed rules and personal context
+├── firebase.json
+├── .github/workflows/deploy.yml
 └── tests/
 ```
 

@@ -1,0 +1,13 @@
+{
+  "functions": [
+    {
+      "source": ".",
+      "codebase": "default",
+      "runtime": "python312",
+      "ignore": [
+        "venv", ".venv", ".git", ".github", "tests", "output", "__pycache__",
+        ".env", ".env.*", "*.md", "firebase.json", ".firebaserc", "firebase-debug.log"
+      ]
+    }
+  ]
+}

@@ -3,7 +3,7 @@ name: Deploy to Firebase
 on:
   push:
     branches: [master]
-    paths-ignore: ["**.md", "tests/**", ".env.example"]
+    paths-ignore: ["**.md", "tests/**", "docs/**", ".env.example"]
   workflow_dispatch:
 
 concurrency: deploy

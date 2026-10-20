@@ -50,6 +50,21 @@ flowchart TD
 - A [Meu Pluggy](https://pluggy.ai/meu-pluggy) account with your banks already connected
 - API credentials (`clientId` and `clientSecret`) from the Pluggy dashboard
 
+## Setting up Meu Pluggy
+
+![Step-by-step Meu Pluggy setup](docs/pluggy-setup.gif)
+
+1. Create an account at [meu.pluggy.ai](https://meu.pluggy.ai) (free for personal use).
+2. Connect each bank: press the connect button, pick your institution and authorize it via Open Finance.
+3. Create a developer account at [dashboard.pluggy.ai](https://dashboard.pluggy.ai). This starts a 15-day trial: finish steps 4–7 before it ends (data keeps flowing afterwards).
+4. In your application, customize the connector list so **MeuPluggy** appears in it.
+5. Create a **Development Application** and copy its `client_id` and `client_secret`.
+6. Click **"Ir para Demo"** and run **"MeuPluggy OAuth Authorization"** once per bank (authorization is per bank, not per account).
+7. In the demo app's three-dot menu, use **"Copiar Item ID"** for each connection. The API cannot list them for you.
+8. Put the values in `.env` (local) or in the GitHub secrets (cloud): `PLUGGY_CLIENT_ID`, `PLUGGY_CLIENT_SECRET`, `PLUGGY_ITEM_IDS` (comma-separated).
+
+Sources: [official Meu Pluggy guide](https://github.com/pluggyai/meu-pluggy) and [Actual Budget's Pluggy guide](https://actualbudget.org/docs/advanced/bank-sync/pluggyai) (Item ID step). To regenerate the GIF: `pip install Pillow && python docs/make_pluggy_setup_gif.py`.
+
 ## Installation
 
 ```bash
@@ -68,7 +83,7 @@ PLUGGY_CLIENT_SECRET=your_client_secret
 PLUGGY_ITEM_IDS=item-id-bank-1,item-id-bank-2
 ```
 
-The Pluggy API has no endpoint to list your connections, so copy the **item ID** of each connected bank from the Meu Pluggy dashboard.
+The Pluggy API has no endpoint to list your connections, so copy the **Item ID** of each connected bank from the demo app (see [Setting up Meu Pluggy](#setting-up-meu-pluggy)).
 
 Personal rules (salary/rent days, keyword categories, atypical-transaction thresholds, transfers to ignore) live in `config.py`.
 
@@ -134,6 +149,7 @@ grok-finance/
 ├── pluggy_client.py     # authentication + API calls
 ├── processor.py         # cleaning, categorization and summary
 ├── config.py            # fixed rules and personal context
+├── docs/                # setup GIF + its generator
 ├── firebase.json
 ├── .github/workflows/deploy.yml
 └── tests/

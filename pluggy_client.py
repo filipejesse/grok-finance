@@ -7,12 +7,12 @@ from __future__ import annotations
 
 from datetime import date
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 import requests
 
 BASE_URL = "https://api.pluggy.ai"
 TIMEOUT = 30
-PAGE_SIZE = 500  # API maximum
 
 
 class PluggyError(RuntimeError):
@@ -49,20 +49,15 @@ class PluggyClient:
         return self._get("/accounts", {"itemId": item_id})["results"]
 
     def get_transactions(self, account_id: str, date_from: date, date_to: date) -> list[dict[str, Any]]:
+        """Cursor-paginated: follow `next` (a URL carrying an `after` cursor) until it is null."""
+        filters = {"accountId": account_id, "dateFrom": date_from.isoformat(), "dateTo": date_to.isoformat()}
         results: list[dict[str, Any]] = []
-        page = 1
+        cursor: dict[str, str] = {}
         while True:
-            data = self._get(
-                "/transactions",
-                {
-                    "accountId": account_id,
-                    "from": date_from.isoformat(),
-                    "to": date_to.isoformat(),
-                    "pageSize": PAGE_SIZE,
-                    "page": page,
-                },
-            )
+            data = self._get("/v2/transactions", {**filters, **cursor})
             results.extend(data["results"])
-            if page >= data.get("totalPages", 1):
+            next_url = data.get("next")
+            after = parse_qs(urlparse(next_url).query).get("after") if next_url else None
+            if not after:
                 return results
-            page += 1
+            cursor = {"after": after[0]}

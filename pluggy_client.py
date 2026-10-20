@@ -61,3 +61,14 @@ class PluggyClient:
             if not after:
                 return results
             cursor = {"after": after[0]}
+
+    def get_bills(self, account_id: str) -> list[dict[str, Any]]:
+        """Closed credit card bills of an account (the current, still open bill is not included)."""
+        results: list[dict[str, Any]] = []
+        page = 1
+        while True:
+            data = self._get("/bills", {"accountId": account_id, "page": page})
+            results.extend(data["results"])
+            if page >= data.get("totalPages", 1):
+                return results
+            page += 1

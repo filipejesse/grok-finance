@@ -35,6 +35,7 @@ INTERNAL_CATEGORIES = ("same person transfer", "credit card payment")
 @dataclass
 class Transaction:
     id: str
+    account_id: str
     account: str
     date: date
     description: str
@@ -44,6 +45,7 @@ class Transaction:
     internal: bool
     pending: bool
     installment: str | None  # e.g. "3/10" for card purchases in installments
+    bill_id: str | None  # closed credit card bill this transaction belongs to, if any
 
 
 def brl(value: float) -> str:
@@ -102,6 +104,7 @@ def normalize(
         result.append(
             Transaction(
                 id=raw["id"],
+                account_id=raw["accountId"],
                 account=account_label(accounts_by_id[raw["accountId"]], banks),
                 date=_parse_date(raw["date"]),
                 description=_clean_description(raw.get("description") or raw.get("descriptionRaw")),
@@ -111,6 +114,7 @@ def normalize(
                 internal=any(c in category.lower() for c in INTERNAL_CATEGORIES),
                 pending=raw.get("status") == "PENDING",
                 installment=_installment(raw),
+                bill_id=(raw.get("creditCardMetadata") or {}).get("billId"),
             )
         )
     result.sort(key=lambda t: (t.date, t.account, t.description))
@@ -141,7 +145,42 @@ def _totals(transactions: list[Transaction]) -> dict[str, Any]:
     }
 
 
-def _account_summary(account: dict[str, Any], banks: dict[str, str]) -> dict[str, Any]:
+def _bill_summary(bill: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "closing_date": _ddmm(bill.get("billClosingDate")),
+        "due_date": _ddmm(bill.get("dueDate")),
+        "total": round(float(bill.get("totalAmount") or 0), 2),
+        "minimum_payment": bill.get("minimumPaymentAmount"),
+        "paid": round(sum(float(p.get("amount") or 0) for p in bill.get("payments") or []), 2),
+    }
+
+
+def _open_bill(
+    account_id: str, closed_bills: list[dict[str, Any]], transactions: list[Transaction]
+) -> dict[str, Any] | None:
+    """Card movements not yet in a closed bill: linked to no closed bill and, when the
+    transaction carries no bill ID, dated after the last closing."""
+    if not closed_bills:
+        return None
+    closed_ids = {b["id"] for b in closed_bills}
+    last = max(closed_bills, key=lambda b: b.get("billClosingDate") or b["dueDate"])
+    last_close = _parse_date(last.get("billClosingDate") or last["dueDate"])
+    open_txs = [
+        t for t in transactions
+        if t.account_id == account_id and not t.internal
+        and (t.bill_id not in closed_ids if t.bill_id else t.date > last_close)
+    ]
+    charges = sum(t.amount for t in open_txs if not t.inflow)
+    credits = sum(t.amount for t in open_txs if t.inflow)
+    return {"since": last_close.strftime("%d/%m"), "total": round(charges - credits, 2), "count": len(open_txs)}
+
+
+def _account_summary(
+    account: dict[str, Any],
+    banks: dict[str, str],
+    bills: list[dict[str, Any]] | None,
+    transactions: list[Transaction],
+) -> dict[str, Any]:
     credit = account.get("creditData") or {}
     entry = {
         "name": account_label(account, banks),
@@ -150,12 +189,14 @@ def _account_summary(account: dict[str, Any], banks: dict[str, str]) -> dict[str
         "balance": round(float(account.get("balance") or 0), 2),
     }
     if entry["is_credit"]:
+        closed = sorted(bills or [], key=lambda b: b.get("billClosingDate") or b["dueDate"])
         entry.update(
             credit_limit=credit.get("creditLimit"),
             available_limit=credit.get("availableCreditLimit"),
-            minimum_payment=credit.get("minimumPayment"),
-            close_date=_ddmm(credit.get("balanceCloseDate")),
-            due_date=_ddmm(credit.get("balanceDueDate")),
+            current_close_date=_ddmm(credit.get("balanceCloseDate")),
+            current_due_date=_ddmm(credit.get("balanceDueDate")),
+            open_bill=_open_bill(account["id"], closed, transactions),
+            last_closed_bill=_bill_summary(closed[-1]) if closed else None,
         )
     return entry
 
@@ -165,8 +206,9 @@ def build_summary(
     transactions: list[Transaction],
     today: date,
     banks: dict[str, str] | None = None,
+    bills: dict[str, list[dict[str, Any]]] | None = None,
 ) -> dict[str, Any]:
-    banks = banks or {}
+    banks, bills = banks or {}, bills or {}
     current = [t for t in transactions if (t.date.year, t.date.month) == (today.year, today.month)]
     previous: dict[tuple[int, int], list[Transaction]] = defaultdict(list)
     for t in transactions:
@@ -177,7 +219,7 @@ def build_summary(
         "period": month_label(today.year, today.month),
         "period_start": today.replace(day=1).isoformat(),
         "generated_on": today.isoformat(),
-        "accounts": [_account_summary(a, banks) for a in accounts],
+        "accounts": [_account_summary(a, banks, bills.get(a["id"]), transactions) for a in accounts],
         "current_month": _totals(current),
         "transactions": [
             {
@@ -204,8 +246,12 @@ READING_NOTES = [
     "Dados extraídos automaticamente via Open Finance (Pluggy), sem nenhuma interpretação "
     "ou regra pessoal aplicada. A análise fica a cargo de quem lê.",
     "Valores em reais. Nas transações, \"+\" é dinheiro entrando na conta e \"-\" é dinheiro saindo.",
-    "Saldo de conta corrente/poupança é o saldo atual informado pelo banco. Em cartão de "
-    "crédito, o saldo é o valor da fatura em aberto.",
+    "Saldo de conta corrente/poupança é o saldo atual informado pelo banco.",
+    "Cartão de crédito: \"fatura atual\" é a fatura ainda aberta, calculada somando os lançamentos "
+    "do cartão feitos depois do fechamento da última fatura (compras menos estornos), e por isso "
+    "pode divergir um pouco do app do banco. \"Última fatura fechada\" vem do banco, com o total e "
+    "quanto já foi pago. \"Saldo devedor total\" é tudo o que se deve no cartão, incluindo faturas "
+    "futuras e parcelas a vencer: não é o valor a pagar este mês.",
     "As categorias são a classificação automática da Pluggy (em inglês) e podem estar erradas; "
     "a descrição original do banco vem sempre junto.",
     "Todas as contas conectadas aparecem juntas. Dinheiro movido entre contas próprias aparece "
@@ -232,6 +278,34 @@ def _totals_lines(t: dict[str, Any]) -> list[str]:
     ]
 
 
+def _card_lines(acc: dict[str, Any]) -> list[str]:
+    lines = []
+    dates = ", ".join(
+        f"{label} {acc[key]}" for key, label in (("current_close_date", "fecha"), ("current_due_date", "vence"))
+        if acc.get(key)
+    )
+    open_bill = acc.get("open_bill")
+    if open_bill:
+        lines.append(f"Fatura atual (aberta{', ' + dates if dates else ''}): {brl(open_bill['total'])} "
+                     f"em {open_bill['count']} lançamentos desde {open_bill['since']}")
+    else:
+        lines.append(f"Fatura atual: indisponível (banco não informou faturas){' | ' + dates if dates else ''}")
+    last = acc.get("last_closed_bill")
+    if last:
+        parts = [f"total {brl(last['total'])}", f"pago {brl(last['paid'])}"]
+        if last["minimum_payment"] is not None:
+            parts.insert(1, f"mínimo {brl(last['minimum_payment'])}")
+        when = ", ".join(f"{label} {last[key]}" for key, label in (("closing_date", "fechou"), ("due_date", "vence"))
+                         if last[key])
+        lines.append(f"Última fatura fechada ({when}): " + " | ".join(parts))
+    limits = [f"Saldo devedor total (inclui faturas futuras e parcelas a vencer): {brl(acc['balance'])}"]
+    for key, label in (("credit_limit", "limite"), ("available_limit", "disponível")):
+        if acc.get(key) is not None:
+            limits.append(f"{label} {brl(acc[key])}")
+    lines.append(" | ".join(limits))
+    return lines
+
+
 def format_text(summary: dict[str, Any]) -> str:
     start = date.fromisoformat(summary["period_start"]).strftime("%d/%m")
     end = date.fromisoformat(summary["generated_on"]).strftime("%d/%m/%Y")
@@ -241,15 +315,7 @@ def format_text(summary: dict[str, Any]) -> str:
     lines += ["", "CONTAS"]
     for acc in summary["accounts"]:
         if acc["is_credit"]:
-            parts = [f"fatura em aberto {brl(acc['balance'])}"]
-            for key, label in (("credit_limit", "limite"), ("available_limit", "disponível"),
-                               ("minimum_payment", "pagamento mínimo")):
-                if acc.get(key) is not None:
-                    parts.append(f"{label} {brl(acc[key])}")
-            for key, label in (("close_date", "fechamento"), ("due_date", "vencimento")):
-                if acc.get(key):
-                    parts.append(f"{label} {acc[key]}")
-            lines.append(f"- {acc['name']} ({acc['kind']}): " + " | ".join(parts))
+            lines += [f"- {acc['name']} ({acc['kind']})"] + [f"  - {line}" for line in _card_lines(acc)]
         else:
             lines.append(f"- {acc['name']} ({acc['kind']}): saldo {brl(acc['balance'])}")
 

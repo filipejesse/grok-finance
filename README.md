@@ -107,7 +107,10 @@ COMO LER ESTES DADOS
 
 CONTAS
 - Itaú · Conta Corrente (Conta corrente): saldo R$ 2.500,50
-- Nubank Ultravioleta (Cartão de crédito): fatura em aberto R$ 820,00 | limite R$ 5.000,00 | ...
+- Nubank Ultravioleta (Cartão de crédito)
+  - Fatura atual (aberta, fecha 08/11, vence 15/11): R$ 391,80 em 3 lançamentos desde 08/10
+  - Última fatura fechada (fechou 08/10, vence 15/10): total R$ 1.020,00 | mínimo R$ 102,00 | pago R$ 900,00
+  - Saldo devedor total (inclui faturas futuras e parcelas a vencer): R$ 820,00 | limite R$ 5.000,00 | ...
 
 TOTAIS DO MÊS (8 transações, valores brutos)
 - Entradas / Saídas / Líquido / Das quais internas

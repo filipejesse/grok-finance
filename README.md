@@ -60,18 +60,26 @@ source venv/bin/activate          # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Create a `.env` file in the project root:
+Copy `.env.example` to `.env` and fill it in:
 
 ```env
 PLUGGY_CLIENT_ID=your_client_id
 PLUGGY_CLIENT_SECRET=your_client_secret
+PLUGGY_ITEM_IDS=item-id-bank-1,item-id-bank-2
 ```
+
+The Pluggy API has no endpoint to list your connections, so copy the **item ID** of each connected bank from the Meu Pluggy dashboard.
+
+Personal rules (salary/rent days, keyword categories, atypical-transaction thresholds, transfers to ignore) live in `config.py`.
 
 ## Usage
 
 ```bash
-python main.py
+python main.py          # print the summary
+python main.py --save   # also write output/resumo-YYYY-MM.txt and .json
 ```
+
+It fetches the current month plus the previous one (`PREVIOUS_MONTHS` in `config.py`). Card bill payments and transfers between your own accounts are excluded from the totals to avoid double counting.
 
 The script outputs a summary like:
 
@@ -103,11 +111,14 @@ Paste the output into Grok and ask for analysis, projections, or alerts.
 grok-finance/
 ├── .env.example
 ├── requirements.txt
-├── main.py
-├── pluggy_client.py
-├── processor.py
-└── config.py
+├── main.py              # entry point
+├── pluggy_client.py     # authentication + API calls
+├── processor.py         # cleaning, categorization and summary
+├── config.py            # fixed rules and personal context
+└── tests/
 ```
+
+Run the tests with `python -m unittest`.
 
 ## Security
 

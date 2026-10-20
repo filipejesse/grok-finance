@@ -53,6 +53,7 @@ jobs:
         run: |
           for name in PLUGGY_CLIENT_ID PLUGGY_CLIENT_SECRET PLUGGY_ITEM_IDS GMAIL_ADDRESS GMAIL_APP_PASSWORD; do
             if [ -z "${!name}" ]; then echo "::error::GitHub secret $name is not set"; exit 1; fi
+            if [[ "${!name}" == PLACEHOLDER* ]]; then echo "::error::GitHub secret $name still has its placeholder value"; exit 1; fi
             printf '%s' "${!name}" | firebase functions:secrets:set "$name" --data-file=- \
               --project "$PROJECT_ID" --non-interactive > /dev/null
             echo "$name synced"

@@ -38,6 +38,6 @@ def send_summary(event: scheduler_fn.ScheduledEvent) -> None:
         PLUGGY_CLIENT_ID.value, PLUGGY_CLIENT_SECRET.value, item_ids, datetime.now(TZ).date()
     )
     emailer.send_summary(
-        GMAIL_ADDRESS.value, GMAIL_APP_PASSWORD.value, f"Resumo financeiro - {summary['period']}", text
+        GMAIL_ADDRESS.value, GMAIL_APP_PASSWORD.value, f"Dados financeiros - {summary['period']}", text
     )
     logging.info("Summary for %s sent.", summary["period"])

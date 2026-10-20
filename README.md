@@ -41,8 +41,8 @@ flowchart TD
 - Authentication with Meu Pluggy API
 - List connected accounts and balances
 - Fetch transactions for a given period
-- Generate a concise, Grok-ready summary
-- Privacy-focused (only summaries leave your environment)
+- Generate a neutral, Grok-ready report (no personal rules baked in)
+- Bounded data: only the current month's transactions plus last month's totals are sent
 
 ## Prerequisites
 
@@ -85,7 +85,7 @@ PLUGGY_ITEM_IDS=item-id-bank-1,item-id-bank-2
 
 The Pluggy API has no endpoint to list your connections, so copy the **Item ID** of each connected bank from the demo app (see [Setting up Meu Pluggy](#setting-up-meu-pluggy)).
 
-Personal rules (salary/rent days, keyword categories, atypical-transaction thresholds, transfers to ignore) live in `config.py`.
+`config.py` only holds credentials and runtime settings (schedule, region, months fetched). No personal finance rules live in the code.
 
 ## Usage
 
@@ -95,31 +95,35 @@ python cli.py --save    # also write output/resumo-YYYY-MM.txt and .json
 python cli.py --email   # also e-mail it (needs GMAIL_* in .env)
 ```
 
-It fetches the current month plus the previous one (`PREVIOUS_MONTHS` in `config.py`). Card bill payments and transfers between your own accounts are excluded from the totals to avoid double counting.
+It fetches the current month plus the previous one (`PREVIOUS_MONTHS` in `config.py`).
 
-The script outputs a summary like:
+The report is deliberately **neutral**: it applies no personal rules and hides nothing. It lists balances, gross totals, outflows per Pluggy category and **every transaction of the current month** (bank, account, signed amount, original description, Pluggy category, `[interna]`/`[pendente]`/`[parcela n/N]` tags), plus totals only for the previous month. A "COMO LER ESTES DADOS" section at the top tells Grok how to read it (sign convention, card bill double counting, internal transfers, cash withdrawals).
 
 ```text
-=== FINANCIAL SUMMARY - MONTH/YEAR ===
-Accounts:
-- Nubank: R$ X,XXX.XX
-- Itaú: R$ X,XXX.XX
+=== DADOS FINANCEIROS - Outubro/2026 (01/10 a 20/10/2026) ===
 
-Period Movement:
-- Inflows: R$ X,XXX.XX
-- Outflows: R$ X,XXX.XX
-- Net: R$ X,XXX.XX
+COMO LER ESTES DADOS
+- ...
 
-Top Categories:
-1. Housing: R$ X,XXX
-2. Food: R$ X,XXX
-...
+CONTAS
+- Itaú · Conta Corrente (Conta corrente): saldo R$ 2.500,50
+- Nubank Ultravioleta (Cartão de crédito): fatura em aberto R$ 820,00 | limite R$ 5.000,00 | ...
 
-Notable Transactions:
-- [date] Description - R$ XXX
+TOTAIS DO MÊS (8 transações, valores brutos)
+- Entradas / Saídas / Líquido / Das quais internas
+
+SAÍDAS POR CATEGORIA (sem internas)
+- Cash withdrawal: R$ 1.800,00 (1x)
+
+TRANSAÇÕES DO MÊS (data | conta | valor | descrição | categoria Pluggy)
+08/10 | Itaú · Conta Corrente | -R$ 1.800,00 | SAQUE AG 1234 | Cash withdrawal
+15/10 | Itaú · Conta Corrente | -R$ 900,00 | Pagamento fatura | Credit card payment [interna]
+
+MÊS ANTERIOR - Setembro/2026 (só totais, 2 transações)
+- ...
 ```
 
-Paste the output into Grok and ask for analysis, projections, or alerts.
+Interpretation belongs to Grok: when you ask it to read the e-mail, give it your own context (payday, fixed bills, how you pay them) in the prompt.
 
 ## Cloud deployment (Firebase)
 
@@ -162,7 +166,7 @@ Run the tests with `python -m unittest`.
 - Never commit your `.env` file
 - Pluggy tokens can be revoked at any time from the dashboard
 - Run the script only in an environment you control
-- Only summaries (never raw transaction data) should be sent to Grok
+- Only the current month's transactions and the previous month's totals are e-mailed (and then shared with Grok); full history never leaves Pluggy
 
 ## Roadmap
 

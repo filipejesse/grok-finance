@@ -21,16 +21,16 @@ def generate(client_id: str, client_secret: str, item_ids: list[str], today: dat
     """Return (summary dict, summary text). Raises PluggyError on API failures."""
     date_from = first_day_months_ago(today, config.PREVIOUS_MONTHS)
     client = PluggyClient(client_id, client_secret)
-    accounts, raw_transactions = [], []
+    accounts, raw_transactions, banks = [], [], {}
     for item_id in item_ids:
         item = client.get_item(item_id)
+        banks[item_id] = (item.get("connector") or {}).get("name", "")
         if item.get("status") != "UPDATED":
-            connector = (item.get("connector") or {}).get("name", item_id)
-            log.warning("%s status is %s; data may be stale.", connector, item.get("status"))
+            log.warning("%s status is %s; data may be stale.", banks[item_id] or item_id, item.get("status"))
         for account in client.get_accounts(item_id):
             accounts.append(account)
             raw_transactions += client.get_transactions(account["id"], date_from, today)
 
-    transactions = normalize(raw_transactions, {a["id"]: a for a in accounts})
-    summary = build_summary(accounts, transactions, today)
+    transactions = normalize(raw_transactions, {a["id"]: a for a in accounts}, banks)
+    summary = build_summary(accounts, transactions, today, banks)
     return summary, format_text(summary)

@@ -58,7 +58,7 @@ def main() -> int:
         print(f"Saved {stem}.txt and {stem}.json", file=sys.stderr)
     if args.email:
         emailer.send_summary(
-            config.GMAIL_ADDRESS, config.GMAIL_APP_PASSWORD, f"Resumo financeiro - {summary['period']}", text
+            config.GMAIL_ADDRESS, config.GMAIL_APP_PASSWORD, f"Dados financeiros - {summary['period']}", text
         )
         print(f"E-mailed to {config.GMAIL_ADDRESS}", file=sys.stderr)
     return 0

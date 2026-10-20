@@ -32,6 +32,7 @@ NON_BANK_CONNECTORS = ("meupluggy",)
 # Pluggy categories (case-insensitive substrings).
 SAME_OWNER_TRANSFER = "same person transfer"
 CARD_PAYMENT = "credit card payment"
+INVESTMENT = "investment"
 INSTALLMENT_SUFFIX = re.compile(r"\s*\d+\s*/\s*\d+\s*$")
 
 
@@ -49,6 +50,8 @@ class Transaction:
     installment_number: int | None
     total_installments: int | None
     purchase_date: date | None
+    matched_transfer: bool = False  # paired with an opposite movement in another own account
+    matched_card_payment: bool = False  # account outflow paying a card whose payment is seen on the card
 
     @property
     def is_card_payment(self) -> bool:
@@ -65,9 +68,11 @@ class Transaction:
 
     @property
     def not_counted(self) -> bool:
-        """Account movement left out of the cash totals: own-account transfers, and card
-        payments seen from the paying account (counted once, from the card side)."""
-        return not self.on_card and (self.is_same_owner_transfer or self.is_card_payment)
+        """Account movement left out of the cash totals: own-account transfers (by Pluggy
+        category or by matching), and card payments seen from the paying account (counted
+        once, from the card side)."""
+        return not self.on_card and (self.is_same_owner_transfer or self.is_card_payment
+                                     or self.matched_transfer or self.matched_card_payment)
 
 
 def brl(value: float) -> str:
@@ -143,7 +148,37 @@ def normalize(
             )
         )
     result.sort(key=lambda t: (t.date, t.account, t.description))
+    _match_card_payments(result)
+    _match_own_transfers(result)
     return result
+
+
+def _match_card_payments(transactions: list[Transaction], max_days: int = 3) -> None:
+    """Banks often categorize the account outflow that pays a card as a plain transfer. Pair
+    each payment seen on a card with an account outflow of the same amount within `max_days`,
+    so the payment is counted once (from the card side)."""
+    outflows = [t for t in transactions if not t.on_card and not t.inflow and not t.not_counted]
+    for payment in (t for t in transactions if t.counted_payment):
+        for out in outflows:
+            if (not out.matched_card_payment and round(out.amount, 2) == round(payment.amount, 2)
+                    and abs((out.date - payment.date).days) <= max_days):
+                out.matched_card_payment = True
+                break
+
+
+def _match_own_transfers(transactions: list[Transaction], max_days: int = 1) -> None:
+    """Pair an outflow from one connected account with an inflow of the same amount into a
+    different connected account within `max_days`: money moving between the user's own
+    accounts that Pluggy did not categorize as such. Each movement joins at most one pair."""
+    candidates = [t for t in transactions if not t.on_card and not t.not_counted]
+    inflows = [t for t in candidates if t.inflow]
+    for out in (t for t in candidates if not t.inflow):
+        for inc in inflows:
+            if (not inc.matched_transfer and inc.account != out.account
+                    and round(inc.amount, 2) == round(out.amount, 2)
+                    and abs((inc.date - out.date).days) <= max_days):
+                out.matched_transfer = inc.matched_transfer = True
+                break
 
 
 def _by_category(txs: list[Transaction]) -> list[dict[str, Any]]:
@@ -156,12 +191,15 @@ def _by_category(txs: list[Transaction]) -> list[dict[str, Any]]:
 
 def _cash_totals(transactions: list[Transaction]) -> dict[str, Any]:
     account_txs = [t for t in transactions if not t.on_card and not t.not_counted]
+    own_transfers = [t for t in transactions if not t.on_card and not t.inflow and not t.is_card_payment
+                     and (t.is_same_owner_transfer or t.matched_transfer)]
     payments = [t for t in transactions if t.counted_payment]
     account_out = [t for t in account_txs if not t.inflow]
     inflows = round(sum(t.amount for t in account_txs if t.inflow), 2)
     card_paid = round(sum(t.amount for t in payments), 2)
     outflows = round(sum(t.amount for t in account_out) + card_paid, 2)
     categories = _by_category(account_out)
+    investments = round(sum(t.amount for t in account_out if INVESTMENT in t.category.lower()), 2)
     if card_paid:
         categories.append({"category": CARD_PAYMENT_LABEL, "total": card_paid, "count": len(payments)})
         categories.sort(key=lambda c: c["total"], reverse=True)
@@ -173,6 +211,9 @@ def _cash_totals(transactions: list[Transaction]) -> dict[str, Any]:
             {"date": t.date.isoformat(), "card": t.account, "amount": round(t.amount, 2)} for t in payments
         ],
         "card_paid": card_paid,
+        "investments": investments,
+        "own_transfers": round(sum(t.amount for t in own_transfers), 2),
+        "own_transfers_count": len(own_transfers),
         "outflows_by_category": categories,
     }
 
@@ -246,7 +287,9 @@ def _tx_dict(t: Transaction) -> dict[str, Any]:
         "category": t.category,
         "pending": t.pending,
         "installment": f"{t.installment_number}/{t.total_installments}" if t.installment_number else None,
-        "not_counted": t.not_counted,
+        "not_counted": t.not_counted and not t.matched_transfer and not t.matched_card_payment,
+        "matched_card_payment": t.matched_card_payment,
+        "matched_transfer": t.matched_transfer,
         "card_payment": t.counted_payment,
     }
 
@@ -294,8 +337,13 @@ READING_NOTES = [
     "o que ainda será pago, incluindo compras recentes e parcelas futuras.",
     "Transferências entre contas do mesmo titular e pagamentos de cartão vistos pela conta que "
     "pagou são marcados [não somado]: o pagamento de cartão já é contado pelo lado do cartão "
-    "([pagamento do cartão]). Transferências que a Pluggy não reconhecer como do mesmo titular "
-    "contam como entrada/saída normal.",
+    "([pagamento do cartão]).",
+    "[pagamento de cartão, já contado no cartão] = saída de conta com o mesmo valor de um pagamento "
+    "recebido pelo cartão em até 3 dias. Não é somada, para o cartão não contar duas vezes.",
+    "[provável transferência entre contas próprias] = saída de uma conta conectada com entrada do "
+    "mesmo valor em outra conta conectada em até 1 dia. Também não é somada. A identificação é "
+    "automática: se for coincidência de valores, conte-a como entrada/saída normal. Transferências "
+    "para contas não conectadas (inclusive próprias) contam como entrada/saída normal.",
     "As categorias são a classificação automática da Pluggy (em inglês) e podem estar erradas; "
     "a descrição original do banco vem sempre junto.",
     "Saques em dinheiro e Pix/transferências para terceiros só dizem para onde o dinheiro saiu, "
@@ -315,7 +363,13 @@ def _cash_lines(t: dict[str, Any]) -> list[str]:
             for p in t["card_payments"]
         )
         lines.append(f"  - das quais pagamentos de cartão: {brl(t['card_paid'])} ({detail})")
+    if t["investments"]:
+        lines.append(f"  - das quais aplicações em investimentos (categoria Pluggy): {brl(t['investments'])}")
     lines.append(f"- Líquido: {brl(t['net'])}")
+    if t["own_transfers"]:
+        n = t["own_transfers_count"]
+        lines.append(f"- Não somado: {brl(t['own_transfers'])} em {n} transferência{'s' if n > 1 else ''} "
+                     "entre contas próprias")
     return lines
 
 
@@ -330,7 +384,10 @@ def _tx_lines(txs: list[dict[str, Any]]) -> list[str]:
         return ["- nenhuma"]
     lines = []
     for t in txs:
-        tags = [label for flag, label in ((t["not_counted"], "não somado"), (t["card_payment"], "pagamento do cartão"),
+        tags = [label for flag, label in ((t["not_counted"], "não somado"),
+                                          (t["matched_transfer"], "provável transferência entre contas próprias"),
+                                          (t["matched_card_payment"], "pagamento de cartão, já contado no cartão"),
+                                          (t["card_payment"], "pagamento do cartão"),
                                           (t["pending"], "pendente")) if flag]
         if t["installment"]:
             tags.append(f"parcela {t['installment']}")

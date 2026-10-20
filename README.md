@@ -100,10 +100,10 @@ It fetches the current month plus the previous one (`PREVIOUS_MONTHS` in `config
 The report is deliberately **neutral**: it applies no personal rules and hides nothing. It uses a **cash view**: money counts in the month it leaves a bank account, so card purchases count only when the card is paid, for the amount paid. It contains:
 
 - balances (cards: total debt, limit, available);
-- monthly inflows/outflows/net, with card payments itemized;
+- monthly inflows/outflows/net, with card payments and investment contributions itemized;
 - outflows per Pluggy category, and card purchases per category as detail (not added to the totals);
 - a **forecast of future spending** from the installments the banks report;
-- every account movement and card charge of the current month, tagged `[não somado]` / `[pagamento do cartão]` / `[pendente]` / `[parcela n/N]`;
+- every account movement and card charge of the current month, tagged `[não somado]` / `[pagamento do cartão]` / `[pagamento de cartão, já contado no cartão]` / `[provável transferência entre contas próprias]` / `[pendente]` / `[parcela n/N]`. Card payments and transfers between connected accounts are detected by matching amounts and dates, since banks often categorize them as plain transfers;
 - totals only for the previous month.
 
 A "COMO LER ESTES DADOS" section at the top tells Grok how to read it.

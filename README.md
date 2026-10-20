@@ -97,7 +97,16 @@ python cli.py --email   # also e-mail it (needs GMAIL_* in .env)
 
 It fetches the current month plus the previous one (`PREVIOUS_MONTHS` in `config.py`).
 
-The report is deliberately **neutral**: it applies no personal rules and hides nothing. It lists balances, gross totals, outflows per Pluggy category and **every transaction of the current month** (bank, account, signed amount, original description, Pluggy category, `[interna]`/`[pendente]`/`[parcela n/N]` tags), plus totals only for the previous month. A "COMO LER ESTES DADOS" section at the top tells Grok how to read it (sign convention, card bill double counting, internal transfers, cash withdrawals).
+The report is deliberately **neutral**: it applies no personal rules and hides nothing. It uses a **cash view**: money counts in the month it leaves a bank account, so card purchases count only when the card is paid, for the amount paid. It contains:
+
+- balances (cards: total debt, limit, available);
+- monthly inflows/outflows/net, with card payments itemized;
+- outflows per Pluggy category, and card purchases per category as detail (not added to the totals);
+- a **forecast of future spending** from the installments the banks report;
+- every account movement and card charge of the current month, tagged `[não somado]` / `[pagamento do cartão]` / `[pendente]` / `[parcela n/N]`;
+- totals only for the previous month.
+
+A "COMO LER ESTES DADOS" section at the top tells Grok how to read it.
 
 ```text
 === DADOS FINANCEIROS - Outubro/2026 (01/10 a 20/10/2026) ===
@@ -107,24 +116,30 @@ COMO LER ESTES DADOS
 
 CONTAS
 - Itaú · Conta Corrente (Conta corrente): saldo R$ 2.500,50
-- Nubank Ultravioleta (Cartão de crédito)
-  - Fatura atual (aberta, fecha 08/11, vence 15/11): R$ 391,80 em 3 lançamentos desde 08/10
-  - Última fatura fechada (fechou 08/10, vence 15/10): total R$ 1.020,00 | mínimo R$ 102,00 | pago R$ 900,00
-  - Saldo devedor total (inclui faturas futuras e parcelas a vencer): R$ 820,00 | limite R$ 5.000,00 | ...
+- Nubank Ultravioleta (Cartão de crédito): saldo devedor total R$ 820,00 | limite R$ 5.000,00 | disponível R$ 4.180,00
 
-TOTAIS DO MÊS (8 transações, valores brutos)
-- Entradas / Saídas / Líquido / Das quais internas
+GASTOS DO MÊS (visão de caixa)
+- Entradas: R$ 6.000,00
+- Saídas: R$ 2.750,00
+  - das quais pagamentos de cartão: R$ 900,00 (Nubank Ultravioleta R$ 900,00 em 15/10)
+- Líquido: R$ 3.250,00
 
-SAÍDAS POR CATEGORIA (sem internas)
-- Cash withdrawal: R$ 1.800,00 (1x)
+SAÍDAS DO MÊS POR CATEGORIA / COMPRAS NO CARTÃO NO MÊS POR CATEGORIA
+- ...
 
-TRANSAÇÕES DO MÊS (data | conta | valor | descrição | categoria Pluggy)
-08/10 | Itaú · Conta Corrente | -R$ 1.800,00 | SAQUE AG 1234 | Cash withdrawal
-15/10 | Itaú · Conta Corrente | -R$ 900,00 | Pagamento fatura | Credit card payment [interna]
+PREVISÃO DE GASTOS FUTUROS (parcelas informadas pelos bancos)
+- Novembro/2026: R$ 300,00
+- ...
 
-MÊS ANTERIOR - Setembro/2026 (só totais, 2 transações)
+MOVIMENTAÇÕES EM CONTA DO MÊS / LANÇAMENTOS NO CARTÃO DO MÊS
+15/10 | Itaú · Conta Corrente | -R$ 900,00 | Pagamento fatura | Credit card payment [não somado]
+15/10 | Nubank Ultravioleta | +R$ 900,00 | Pagamento recebido | Credit card payment [pagamento do cartão]
+
+MÊS ANTERIOR - Setembro/2026 (só totais, visão de caixa)
 - ...
 ```
+
+Some banks (e.g. BTG) do not send installment purchases through Open Finance; their installments are missing from both the card charges and the forecast.
 
 Interpretation belongs to Grok: when you ask it to read the e-mail, give it your own context (payday, fixed bills, how you pay them) in the prompt.
 

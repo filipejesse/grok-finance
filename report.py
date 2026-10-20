@@ -6,7 +6,7 @@ from datetime import date
 from typing import Any
 
 import config
-from pluggy_client import PluggyClient, PluggyError
+from pluggy_client import PluggyClient
 from processor import build_summary, format_text, normalize
 
 log = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ def generate(client_id: str, client_secret: str, item_ids: list[str], today: dat
     """Return (summary dict, summary text). Raises PluggyError on API failures."""
     date_from = first_day_months_ago(today, config.PREVIOUS_MONTHS)
     client = PluggyClient(client_id, client_secret)
-    accounts, raw_transactions, banks, bills = [], [], {}, {}
+    accounts, raw_transactions, banks = [], [], {}
     for item_id in item_ids:
         item = client.get_item(item_id)
         banks[item_id] = (item.get("connector") or {}).get("name", "")
@@ -30,12 +30,9 @@ def generate(client_id: str, client_secret: str, item_ids: list[str], today: dat
         for account in client.get_accounts(item_id):
             accounts.append(account)
             raw_transactions += client.get_transactions(account["id"], date_from, today)
-            if account.get("type") == "CREDIT":
-                try:
-                    bills[account["id"]] = client.get_bills(account["id"])
-                except PluggyError as exc:  # bills are optional: report without them
-                    log.warning("Could not fetch bills for a card account: %s", exc)
 
     transactions = normalize(raw_transactions, {a["id"]: a for a in accounts}, banks)
-    summary = build_summary(accounts, transactions, today, banks, bills)
+    # Pluggy filters by UTC date; drop late-evening movements that are still the previous day locally.
+    transactions = [t for t in transactions if t.date >= date_from]
+    summary = build_summary(accounts, transactions, today, banks)
     return summary, format_text(summary)
